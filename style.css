@@ -1,0 +1,57 @@
+body {
+    background-color: #000;
+    color: #0F0;
+    font-family: 'Courier New', Courier, monospace;
+    margin: 0;
+    padding: 0;
+}
+
+#terminal {
+    padding: 10px;
+    height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+#output {
+    overflow-y: auto;
+    height: calc(100vh - 40px); /* Adjust as needed */
+    flex-grow: 1;
+    white-space: pre-wrap; /* Preserve whitespace and wrap lines */
+}
+
+#input {
+    background-color: #000;
+    color: #0F0;
+    border: none;
+    outline: none;
+    width: 100%;
+    padding: 5px;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Add to existing styles */
+.input-line {
+    display: flex; /* Align prompt and input field on the same line */
+    align-items: center; /* Vertically align items in the middle */
+    padding: 2px 0;
+}
+
+.prompt {
+    color: #0f0; /* Or your chosen prompt color */
+    margin-right: 8px;
+    white-space: nowrap; /* Prevent prompt from wrapping */
+}
+
+#commandInput {
+    background-color: transparent;
+    border: none;
+    color: #0f0; /* Or your chosen text color */
+    font-family: 'Courier New', Courier, monospace; /* Ensure consistent font */
+    font-size: 1em; /* Ensure consistent font size */
+    flex-grow: 1; /* Allow input field to take remaining space */
+    outline: none; /* Remove focus outline */
+}
