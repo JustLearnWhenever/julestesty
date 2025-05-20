@@ -6,6 +6,8 @@ let currentGameMission = null;
 let simulatedFileSystems = {};
 // Global variable for the current path on the remote system
 let currentPath = null;
+// Global state for Mission 4 DLL Proxying
+let playerHasCreatedProxyFor = null; 
 
 const educationalContent = {
     "dll hijacking": {
@@ -26,6 +28,30 @@ const educationalContent = {
         prevention_detection: [
             "Developers: Harder to prevent directly by an application.",
             "System Admins: Monitor for unusual memory allocations and thread creation in processes. Use Endpoint Detection and Response (EDR) tools that can analyze memory and detect in-memory threats. Scrutinize processes that don't have corresponding image files on disk. Look for signs of manual PE header mapping in memory."
+        ]
+    },
+    "dll injection (createremotethread)": {
+        title: "DLL Injection (CreateRemoteThread)",
+        what_it_is: "A common technique to execute arbitrary code within the address space of another process.",
+        how_it_works: "CreateRemoteThread is a Windows API function that creates a thread in another process. Attackers often use it to make the remote process call LoadLibrary with the path to their malicious DLL, causing the DLL to be loaded and its code executed.",
+        real_world_tools: "Many Remote Access Trojans (RATs), Metasploit Framework, custom injection tools.",
+        prevention_detection: [
+            "System Admins: Monitor for CreateRemoteThread API calls, especially from untrusted processes or to critical system processes.",
+            "System Admins: Analyze loaded modules in processes; unexpected DLLs can be a sign of injection.",
+            "System Admins: Employ Endpoint Detection and Response (EDR) solutions that often flag suspicious remote thread creation and cross-process memory operations.",
+            "Developers: Strong process integrity levels can hinder this technique by preventing lower integrity processes from injecting into higher integrity ones."
+        ]
+    },
+    "dll proxying": {
+        title: "DLL Proxying",
+        what_it_is: "An attacker creates a malicious DLL that exports the same functions as a legitimate DLL. When an application loads the proxy, it executes the attacker's code while forwarding legitimate calls to the original DLL.",
+        how_it_works: "The proxy DLL is placed where the application expects the original. The original DLL might be renamed and also placed nearby so the proxy can find it. The proxy receives calls, performs malicious actions, and then passes the call to the same function in the original DLL.",
+        real_world_tools: "Often custom developed. Some frameworks or tools might assist in generating proxy DLLs (e.g., helper scripts).",
+        prevention_detection: [
+            "System Admins: File integrity monitoring (FIM) can detect unauthorized replacement or modification of legitimate DLLs.",
+            "System Admins: Application whitelisting can prevent unknown or unauthorized DLLs from being loaded.",
+            "Developers: Ensure applications load DLLs from secure, expected locations and validate them (e.g., using code signing).",
+            "System Admins: Behavior analysis might detect unusual activity if the proxy DLL performs overtly malicious actions."
         ]
     }
     // Add more topics here later
@@ -132,6 +158,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentPath = normalizePath("C:\\"); // Reset path if connected to mission target
                     }
                     addOutputLine(`Mission 1: Basic DLL Hijacking started. Target: ${currentGameMission.targetIp}. Type 'briefing' for details.`);
+                } else if (missionId === 2) {
+                        currentGameMission = {
+                            id: 2,
+                            name: "DLL Injection via CreateRemoteThread",
+                            active: true,
+                            targetIp: "192.168.1.152",
+                            targetProcessName: "NotePadLite.exe",
+                            targetPid: 5678, // Simulated PID
+                            payloadDll: "msgbox_payload.dll", // Assumed available to player
+                            requiredTool: "simple_injector.exe",
+                            objectiveMet: false,
+                            briefingDetails: "A simple application, 'NotePadLite.exe' (PID " + 5678 + ") on " + "192.168.1.152" + ", is running. Use 'simple_injector.exe' to inject 'msgbox_payload.dll' into it. This should cause a message box to appear (simulated)."
+                        };
+                        simulatedFileSystems[currentGameMission.targetIp] = { // Basic FS for this target
+                            "C:\\": { type: "dir", children: { "Windows": { type: "dir", children: {} }, "Program Files": { type: "dir", children: {} }} }
+                        };
+                        if (connectedIp === currentGameMission.targetIp) { // Ensure currentPath is reset if already connected
+                           currentPath = normalizePath("C:\\");
+                        }
+                        addOutputLine("Mission 2: DLL Injection via CreateRemoteThread started. Target: 192.168.1.152. Type 'briefing' for details.");
                 } else if (missionId === 3) {
                     currentGameMission = {
                         id: 3,
@@ -148,11 +194,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     simulatedFileSystems[currentGameMission.targetIp] = { // Basic FS for this target
                         "C:\\": { type: "dir", children: { "Windows": { type: "dir", children: {} }, "ProgramData": { type: "dir", children: {} }} }
                     };
-                    // No specific files needed for player to interact with on target FS for this mission directly
                     if (connectedIp === currentGameMission.targetIp) {
-                        currentPath = normalizePath("C:\\"); // Reset path if connected
+                        currentPath = normalizePath("C:\\"); 
                     }
                     addOutputLine("Mission 3: Reflective DLL Injection started. Target: 192.168.1.202. Type 'briefing' for details.");
+                } else if (missionId === 4) {
+                    currentGameMission = {
+                        id: 4,
+                        name: "DLL Proxying",
+                        active: true,
+                        targetIp: "192.168.1.224",
+                        targetApp: "GraphicsEditor.exe",
+                        originalDll: "RenderUtils.dll",
+                        renamedOriginalDll: "RenderUtils_orig.dll",
+                        proxyPayloadPlaceholder: "evil_payload.dll", // Conceptual
+                        targetPath: normalizePath("C:\\Program Files\\GraphicsEditor\\"), // Normalized
+                        objectiveMet: false,
+                        briefingDetails: "The 'GraphicsEditor.exe' on " + "192.168.1.224" + " uses '" + "RenderUtils.dll" + "' for its core functions. Your task is to create a proxy DLL that looks like '" + "RenderUtils.dll" + "' but also executes your payload. Upload your proxy (as '" + "RenderUtils.dll" + "') and the original (renamed to '" + "RenderUtils_orig.dll" + "') to '" + "C:\\Program Files\\GraphicsEditor\\" + "'. Then run '" + "GraphicsEditor.exe" + "'."
+                    };
+                    simulatedFileSystems[currentGameMission.targetIp] = {
+                        "C:\\": { type: "dir", children: { "Program Files": { type: "dir", children: { "GraphicsEditor": { type: "dir", children: {
+                            "GraphicsEditor.exe": { type: "file", content: "Executable" },
+                            "RenderUtils.dll": { type: "file", content: "Original Rendering Utilities", isOriginal: true } // Mark the original
+                        }}}}}}
+                    };
+                    playerHasCreatedProxyFor = null; // Reset proxy creation state
+                    if (connectedIp === currentGameMission.targetIp) { // If already connected to target, reset path
+                        currentPath = normalizePath("C:\\");
+                    } else { // If not connected, or connected elsewhere, don't change currentPath unless it implies connection
+                        currentPath = normalizePath("C:\\"); // Defaulting to C:\ if not connected is a choice, or leave as is.
+                    }
+                    addOutputLine("Mission 4: DLL Proxying started. Target: 192.168.1.224. Type 'briefing' for details.");
                 }
                 else {
                     addOutputLine("Invalid mission ID.");
@@ -180,6 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             status = "\nStatus: Awaiting reflective injection of " + currentGameMission.payloadDll + " into " + currentGameMission.targetProcessName + " (PID " + currentGameMission.targetPid + ").";
                         }
+                    } else if (currentGameMission.id === 2) {
+                         if (currentGameMission.objectiveMet) {
+                            status = "\nStatus: Objective Accomplished! NotePadLite.exe has been injected.";
+                        } else {
+                            status = "\nStatus: Awaiting injection of " + currentGameMission.payloadDll + " into " + currentGameMission.targetProcessName + " (PID " + currentGameMission.targetPid + ").";
+                        }
                     }
                     addOutputLine(status);
                 } else {
@@ -198,6 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (scanIp === "192.168.1.202") { // Target IP for Mission 3
                          addOutputLine(`Open ports: 443 (HTTPS), 9001 (Custom/SecureLogger)`);
                          addOutputLine("Running Processes:\n  PID  Name\n  ---- ----\n  1234 SecureLogger.exe\n  789  explorer.exe\n  800  svchost.exe");
+                    } else if (scanIp === "192.168.1.152") { // Target IP for Mission 2
+                         addOutputLine(`Open ports: 80 (HTTP), 139 (NetBIOS), 445 (SMB)`);
+                         addOutputLine("Running Processes:\n  PID  Name\n  ---- ----\n  5678 NotePadLite.exe\n  1012 other_process.exe");
                     }
                      else {
                        addOutputLine(`Open ports: 80 (HTTP), 445 (SMB), 3389 (RDP)`);
@@ -372,18 +453,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 break;
             case 'execute':
-                const programName = args[0] ? args[0].toLowerCase() : "";
+                    const programCommand = args[0] ? args[0].toLowerCase() : ""; // Renamed for clarity
+                    
                 // Mission 3: Reflective DLL Injection
-                if (programName === "reflective_injector.exe") {
+                    if (programCommand === "reflective_injector.exe") {
                     if (!currentGameMission || !currentGameMission.active || currentGameMission.id !== 3) {
                         addOutputLine("No active mission requires reflective_injector.exe.");
                         break;
                     }
-                    if (args.length < 2) {
+                        if (args.length < 3) { // execute reflective_injector.exe <pid> <dll_name>
                         addOutputLine("Usage: execute reflective_injector.exe <pid> <dll_name>");
                         break;
                     }
-                    const pidArg = parseInt(args[1]); // Args are program_name, pid, dll_name
+                        const pidArg = parseInt(args[1]); 
                     const dllNameArg = args[2];
 
                     if (pidArg === currentGameMission.targetPid && dllNameArg && dllNameArg.toLowerCase() === currentGameMission.payloadDll.toLowerCase()) {
@@ -392,16 +474,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         addOutputLine("Reflective injector failed: Incorrect PID, DLL name for current objective, or target process not found.");
                     }
-                } 
+                    }
+                    // Mission 2: Standard DLL Injection
+                    else if (programCommand === "simple_injector.exe") {
+                        if (!currentGameMission || !currentGameMission.active || currentGameMission.id !== 2) {
+                            addOutputLine("No active mission requires simple_injector.exe.");
+                            break;
+                        }
+                        if (args.length < 3) { // execute simple_injector.exe <pid> <dll_name>
+                            addOutputLine("Usage: execute simple_injector.exe <pid> <dll_name>");
+                            break;
+                        }
+                        const pidToInject = parseInt(args[1]); 
+                        const dllToInject = args[2];
+
+                        if (pidToInject === currentGameMission.targetPid && dllToInject && dllToInject.toLowerCase() === currentGameMission.payloadDll.toLowerCase()) {
+                            currentGameMission.objectiveMet = true;
+                            addOutputLine("Executing simple_injector.exe... Injecting " + currentGameMission.payloadDll + " into PID " + currentGameMission.targetPid + "... SUCCESS! A (simulated) message box pops up from NotePadLite.exe.");
+                        } else {
+                            addOutputLine("Injector failed: Incorrect PID or DLL name for current objective, or target process not found.");
+                        }
+                    }
                 // Mission 1: Basic DLL Hijacking & Generic execution
                 else if (!connectedIp || !currentPath) {
                     addOutputLine("Not connected to any target or path not set.");
-                } else if (args.length === 0 && !programName) { // Check if programName is empty
+                    } else if (args.length === 0 && !programCommand) { // Check if programCommand is empty
                     addOutputLine("Usage: execute <program_name> [args]");
                 } else {
                     if (currentGameMission && currentGameMission.active && currentGameMission.id === 1 &&
                         connectedIp === currentGameMission.targetIp &&
-                        programName === currentGameMission.vulnerableProgram.toLowerCase() && // programName is already lowercased
+                            programCommand === currentGameMission.vulnerableProgram.toLowerCase() && 
                         normalizePath(currentPath) === currentGameMission.vulnerablePath) {
 
                         // Check if the vulnerable DLL is in place
@@ -410,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             currentGameMission.objectiveMet = true;
                             // Add "hacked.txt" to the vulnerable path's directory content
                             if(simulatedFileSystems[connectedIp] && getPathObject(connectedIp, currentGameMission.vulnerablePath)){
-                                 // Need to access the children of the vulnerablePath directly
                                 let targetDirChildren = simulatedFileSystems[connectedIp];
                                 const pathParts = currentGameMission.vulnerablePath.split('\\').filter(p=>p);
                                 pathParts.forEach(part => {
@@ -429,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             addOutputLine(`Executing ${currentGameMission.vulnerableProgram}... The program runs as expected. Nothing unusual happens.`);
                         }
                     } else {
-                        addOutputLine(`Simulating execution of ${programName}...`);
+                            addOutputLine(`Simulating execution of ${programCommand}...`);
                     }
                 }
                 break;
